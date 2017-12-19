@@ -159,14 +159,15 @@ module SingleCycleControl(Reg2Loc, ALUSrc, MemToReg, RegWrite, MemRead, MemWrite
         end
         /*add code here for the rest of the instructions*/
         default: begin
-           Reg2Loc <= #2 1'bx;
-           ALUSrc <= #2 1'bx;
-           MemToReg <= #2 1'bx;
-           RegWrite <= #2 1'bx;
-           MemRead <= #2 1'bx;
-           MemWrite <= #2 1'bx;
-           Branch <= #2 1'bx;
-           ALUOp <= #2 2'bxx;
+           Reg2Loc <= #2 1'b0;
+           ALUSrc <= #2 1'b0;
+           MemToReg <= #2 1'b0;
+           RegWrite <= #2 1'b0;
+           MemRead <= #2 1'b0;
+           MemWrite <= #2 1'b0;
+           Branch <= #2 1'b0;
+           ALUOp <= #2 2'b00;
+	   Uncondbranch <= #2 1'b0;
         end
       endcase
    end

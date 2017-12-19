@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+`define NOP 32'h8B1F03FF
 /*
  * Module: InstructionMemory
  *
@@ -27,37 +28,51 @@ module InstructionMemory(Data, Address);
 	 * 
 	 * Assembly code for test:
 	 * 
-	 * 0: LDUR X9, [XZR, 0x0]    //Load 1 into x9
-	 * 4: LDUR X10, [XZR, 0x8]   //Load a into x10
-	 * 8: LDUR X11, [XZR, 0x10]  //Load 5 into x11
-	 * C: LDUR X12, [XZR, 0x18]  //Load big constant into x12
-	 * 10: LDUR X13, [XZR, 0x20]  //load a 0 into X13
+	 * LDUR X9, [XZR, 0x0]    //Load 1 into x9
+	 * LDUR X10, [XZR, 0x8]   //Load a into x10
+	 * LDUR X11, [XZR, 0x10]  //Load 5 into x11
+	 * LDUR X12, [XZR, 0x18]  //Load big constant into x12
+	 * LDUR X13, [XZR, 0x20]  //load a 0 into X13
 	 * 
-	 * 14: ORR X10, X10, X11  //Create mask of 0xf
-	 * 18: AND X12, X12, X10  //Mask off low order bits of big constant
+	 * ORR X10, X10, X11  //Create mask of 0xf
+	 * AND X12, X12, X10  //Mask off low order bits of big constant
 	 * 
 	 * loop:
-	 * 1C: CBZ X12, end  //while X12 is not 0
-	 * 20: ADD X13, X13, X9  //Increment counter in X13
-	 * 24: SUB X12, X12, X9  //Decrement remainder of big constant in X12
-	 * 28: B loop  //Repeat till X12 is 0
-	 * 2C: STUR X13, [XZR, 0x20]  //store back the counter value into the memory location 0x20
+	 * CBZ X12, end  //while X12 is not 0
+	 * ADD X13, X13, X9  //Increment counter in X13
+	 * SUB X12, X12, X9  //Decrement remainder of big constant in X12
+	 * B loop  //Repeat till X12 is 0
+	 * end: 
+	 * STUR X13, [XZR, 0x20]  //store back the counter value into the memory location 0x20
 	 */
 	
-
-	63'h000: Data = 32'hF84003E9;
-	63'h004: Data = 32'hF84083EA;
-	63'h008: Data = 32'hF84103EB;
-	63'h00c: Data = 32'hF84183EC;
-	63'h010: Data = 32'hF84203ED;
-	63'h014: Data = 32'hAA0B014A;
-	63'h018: Data = 32'h8A0A018C;
-	63'h01c: Data = 32'hB400008C;
-	63'h020: Data = 32'h8B0901AD;
-	63'h024: Data = 32'hCB09018C;
-	63'h028: Data = 32'h17FFFFFD;
-	63'h02c: Data = 32'hF80203ED;
-	63'h030: Data = 32'hF84203ED;  //One last load to place stored value on memdbus for test checking.
+    	64'h000: Data = 32'hF84083EA; //LDUR X10, [XZR, 0x8]
+    	64'h004: Data = 32'hF84103EB; //LDUR X11, [XZR, 0x10]
+    	64'h008: Data = 32'hF84183EC; //LDUR X12, [XZR, 0x18]
+	64'h00c: Data = 32'hF84003E9; //LDUR X9, [XZR, 0x0]
+	64'h010: Data = 32'hF84203ED; //LDUR X13, [XZR, 0x20]
+	64'h014: Data = 32'hAA0B014A; //ORR X10, X10, X11
+	64'h018: Data = `NOP; //Stall
+	64'h01c: Data = `NOP; //Stall dependency on X10
+	64'h020: Data = 32'h8A0A018C; //AND X12, X12, X10
+	64'h024: Data = `NOP; //Stall
+	64'h028: Data = `NOP; //Stall dependency on X12
+	64'h02c: Data = 32'hB400014C; //CBZ X12, end ; loop
+	64'h030: Data = `NOP; //Stall
+	64'h034: Data = `NOP; //Stall
+	64'h038: Data = `NOP; //Stall Don't want to run the next instruction if we are branching
+	64'h03c: Data = 32'h8B0901AD; //ADD X13, X13, X9
+	64'h040: Data = 32'hCB09018C; //SUB X12, X12, X9
+	64'h044: Data = 32'h17FFFFFA; //B loop
+	64'h048: Data = `NOP; //Stall
+	64'h04c: Data = `NOP; //Stall
+	64'h050: Data = `NOP; //Stall Don't want to run the next instruction when we are branching
+	64'h054: Data = 32'hF80203ED; //STUR X13, [XZR, 0x20] ; end
+	64'h058: Data = 32'hF84203ED;  //One last load to place stored value on memdbus for test checking.; LDUR X13,[XZR, 0x20]
+	64'h05c: Data = `NOP;
+	64'h060: Data = `NOP;
+	64'h064: Data = `NOP;
+	64'h068: Data = `NOP; //Add stalls to wait for the value to be placed on the MemBus in the WriteBack stage
 
 	/* Add code for your tests here */
 	/* Test Program 2:
@@ -76,23 +91,52 @@ module InstructionMemory(Data, Address);
 	 * xx: STUR X9, [XZR, 0x28] // store to memory => 11111000000 000101000 00 11111 01001
 	 * xx: LDUR X10, [XZR, 0x28] // to check if correct => 11111000010 000101000 00 11111 01010
 	 */
-	63'h038: Data = 32'h8B1F03E9; // start of tests
-	63'h03c: Data = 32'hB2048D29; // 0x123
-	63'h040: Data = 32'hD37F3129; // shift
-	63'h044: Data = 32'hB2115929; // 0x456
-	63'h048: Data = 32'hD37F3129; // shift
-	63'h04c: Data = 32'hB21E2529; // 0x789
-	63'h050: Data = 32'hD37F3129; // shift
-	63'h054: Data = 32'hB22AF129; // 0xabc
-	63'h058: Data = 32'hD37F3129; // shift
-	63'h05c: Data = 32'hB237BD29; // 0xdef
-	63'h060: Data = 32'hD37F1129; // shift 4
 
-	63'h064: Data = 32'hF80283E9;
-	63'h068: Data = 32'hF84283EA;
-// */
+// 2 NOPs are needed to prevent data hazards for R-types
+// 3 are needed for loads
+
+	63'h06c: Data = 32'h8B1F03E9; // start of tests
+	63'h070: Data = `NOP;
+	63'h074: Data = `NOP;
+	63'h078: Data = 32'hB2048D29; // 0x123
+	63'h07c: Data = `NOP;
+	63'h080: Data = `NOP;
+	63'h084: Data = 32'hD37F3129; // shift
+	63'h088: Data = `NOP;
+	63'h08c: Data = `NOP;
+	63'h090: Data = 32'hB2115929; // 0x456
+	63'h094: Data = `NOP;
+	63'h098: Data = `NOP;
+	63'h09c: Data = 32'hD37F3129; // shift
+	63'h0a0: Data = `NOP;
+	63'h0a4: Data = `NOP;
+	63'h0a8: Data = 32'hB21E2529; // 0x789
+	63'h0ac: Data = `NOP;
+	63'h0b0: Data = `NOP;
+	63'h0b4: Data = 32'hD37F3129; // shift
+	63'h0b8: Data = `NOP;
+	63'h0bc: Data = `NOP;
+	63'h0c0: Data = 32'hB22AF129; // 0xabc
+	63'h0c4: Data = `NOP;
+	63'h0c8: Data = `NOP;
+	63'h0cc: Data = 32'hD37F3129; // shift
+	63'h0d0: Data = `NOP;
+	63'h0d4: Data = `NOP;
+	63'h0d8: Data = 32'hB237BD29; // 0xdef
+	63'h0dc: Data = `NOP;
+	63'h0e0: Data = `NOP;
+	63'h0e4: Data = 32'hD37F1129; // shift 4
+	63'h0e8: Data = `NOP;
+	63'h0ec: Data = `NOP;
+
+	63'h0f0: Data = 32'hF80283E9; // stur
+	63'h0f4: Data = `NOP;
+	63'h0f8: Data = `NOP;
+	63'h0fc: Data = `NOP;
+	63'h100: Data = 32'hF84283EA; // ldur
+
 			
-	default: Data = 32'hXXXXXXXX;
+	default: Data = `NOP;
       endcase
    end
 endmodule
